@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""
+Model training script for Credit Card Fraud Detection MLOps Pipeline.
+
+This script:
+1. Loads preprocessed data from a specific DVC version
+2. Trains a Gradient Boosting model (XGBoost)
+3. Performs hyperparameter tuning
+4. Tracks experiments with MLflow
+5. Registers the best model
+
+Usage:
+    python train.py --data-rev <DVC_REVISION>
+"""
+
+import os
+import sys
+import logging
+import argparse
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import joblib
+from xgboost import XGBClassifier
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, average_precision_score, confusion_matrix
+)
+import mlflow
+import mlflow.xgboost
+import subprocess
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger('model-training')
+
+# Constants
+DATA_DIR = Path("data")
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+MODELS_DIR = Path("models")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Model training script')
+    parser.add_argument('--data-rev', type=str, required=True,
+                        help='DVC revision/version of the processed data to use')
+    return parser.parse_args()
+
+
+def setup_directories():
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def setup_mlflow():
+    mlflow.set_tracking_uri("http://localhost:5000")
+    mlflow.set_experiment("credit-card-fraud-detection")
+
+
+def load_data(data_rev):
+    subprocess.run(["dvc", "pull", str(PROCESSED_DATA_DIR), "-r", "origin", "--rev", data_rev], check=True)
+    train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
+    val_df = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
+    X_train = train_df.drop(columns=["Class"])
+    y_train = train_df["Class"]
+    X_val = val_df.drop(columns=["Class"])
+    y_val = val_df["Class"]
+    return X_train, y_train, X_val, y_val
+
+
+def train_model(X_train, y_train, X_val, y_val):
+    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+
+    param_dist = {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.01, 0.1, 0.2],
+        "subsample": [0.6, 0.8, 1.0]
+    }
+
+    search = RandomizedSearchCV(model, param_distributions=param_dist, n_iter=10,
+                                scoring='roc_auc', cv=3, verbose=1, n_jobs=-1, random_state=42)
+    search.fit(X_train, y_train)
+    best_model = search.best_estimator_
+    return best_model, search.best_params_
+
+
+def evaluate_model(model, X_val, y_val):
+    y_pred = model.predict(X_val)
+    y_proba = model.predict_proba(X_val)[:, 1]
+    metrics = {
+        "accuracy": accuracy_score(y_val, y_pred),
+        "precision": precision_score(y_val, y_pred),
+        "recall": recall_score(y_val, y_pred),
+        "f1": f1_score(y_val, y_pred),
+        "roc_auc": roc_auc_score(y_val, y_proba),
+        "avg_precision": average_precision_score(y_val, y_proba)
+    }
+    return metrics
+
+
+def log_to_mlflow(model, params, metrics, X_val, y_val):
+    with mlflow.start_run():
+        mlflow.log_params(params)
+        mlflow.log_metrics(metrics)
+        mlflow.xgboost.log_model(model, "model")
+        mlflow.register_model("runs:/{}/model".format(mlflow.active_run().info.run_id), "fraud-detection-model")
+
+
+def save_model(model):
+    joblib.dump(model, MODELS_DIR / "model.joblib")
+
+
+def main():
+    args = parse_args()
+    logger.info(f"Starting model training pipeline with data revision: {args.data_rev}")
+
+    setup_directories()
+    setup_mlflow()
+    X_train, y_train, X_val, y_val = load_data(args.data_rev)
+    model, best_params = train_model(X_train, y_train, X_val, y_val)
+    metrics = evaluate_model(model, X_val, y_val)
+    log_to_mlflow(model, best_params, metrics, X_val, y_val)
+    save_model(model)
+
+    logger.info("Model training completed successfully")
+
+
+if __name__ == "__main__":
+    main()

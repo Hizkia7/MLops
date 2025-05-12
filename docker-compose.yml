@@ -1,0 +1,27 @@
+version: '3.8'
+
+# Your Task: Implement a docker-compose.yml file that sets up:
+# 1. MLflow tracking server with a database backend
+# 2. DVC remote storage using MinIO or similar
+# 3. Any additional services needed for the pipeline
+
+services:
+  # TODO: Define MLflow tracking server
+  # ...
+
+  # TODO: Define database for MLflow
+  # ...
+
+  # TODO: Define MinIO or similar service for DVC remote storage
+  # ...
+
+  # TODO: Add any additional services you consider necessary
+  # ...
+
+volumes:
+  # TODO: Define persistent volumes
+  # ...
+
+# Add networks if necessary
+# networks:
+#   ...
