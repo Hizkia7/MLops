@@ -1,27 +1,74 @@
 version: '3.8'
 
-# Your Task: Implement a docker-compose.yml file that sets up:
-# 1. MLflow tracking server with a database backend
-# 2. DVC remote storage using MinIO or similar
-# 3. Any additional services needed for the pipeline
-
 services:
-  # TODO: Define MLflow tracking server
-  # ...
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_BACKEND_STORE_URI=postgresql://mlflow:mlflow@mlflow-db/mlflow
+      - MLFLOW_ARTIFACT_ROOT=s3://mlflow/
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio123
+    command: >
+      mlflow server
+        --backend-store-uri postgresql://mlflow:mlflow@mlflow-db/mlflow
+        --default-artifact-root s3://mlflow/
+        --host 0.0.0.0
+    depends_on:
+      - mlflow-db
+      - minio
+    networks:
+      - mlops-net
 
-  # TODO: Define database for MLflow
-  # ...
+  mlflow-db:
+    image: postgres:13
+    container_name: mlflow-db
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mlops-net
 
-  # TODO: Define MinIO or similar service for DVC remote storage
-  # ...
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # Console
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    volumes:
+      - minio_data:/data
+    networks:
+      - mlops-net
 
-  # TODO: Add any additional services you consider necessary
-  # ...
+  create-bucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set myminio http://minio:9000 minio minio123;
+      mc mb myminio/mlflow;
+      mc policy set public myminio/mlflow;
+      exit 0;
+      "
+    networks:
+      - mlops-net
 
 volumes:
-  # TODO: Define persistent volumes
-  # ...
+  pgdata:
+  minio_data:
 
-# Add networks if necessary
-# networks:
-#   ...
+networks:
+  mlops-net:
+    driver: bridge

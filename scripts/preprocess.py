@@ -18,12 +18,13 @@ import os
 import sys
 import logging
 import argparse
+import subprocess
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-# Import additional libraries as needed (e.g., imbalanced-learn for SMOTE)
+from imblearn.under_sampling import RandomUnderSampler
 import mlflow
 
 # Setup logging
@@ -38,69 +39,107 @@ logger = logging.getLogger('data-preprocessing')
 DATA_DIR = Path("data")
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-RAW_DATA_FILE = RAW_DATA_DIR / "creditcard.csv"
+RAW_DATA_FILE = RAW_DATA_DIR / "creditcard-data.csv"
 
 def parse_args():
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Data preprocessing script')
-    parser.add_argument('--data-rev', type=str, required=True,
-                        help='DVC revision/version of the raw data to use')
-    # Add more arguments as needed
+    parser.add_argument('--data-rev', type=str, required=True, help='DVC revision/version of the raw data to use')
     return parser.parse_args()
 
 def setup_directories():
-    """Create necessary directories if they don't exist."""
-    # TODO: Implement this function
-    pass
+    logger.info(f"Creating processed data directory: {PROCESSED_DATA_DIR}")
+    PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def setup_mlflow():
-    """Configure MLflow tracking."""
-    # TODO: Implement this function
-    pass
+    mlflow.set_tracking_uri("http://mlflow:5000")
+    mlflow.set_experiment("Preprocessing")
 
 def load_data(data_rev):
-    """Load raw data from specific DVC revision."""
-    # TODO: Implement this function to:
-    # 1. Checkout specific revision of the data
-    # 2. Load the data
-    pass
+    logger.info(f"Checking out raw data at DVC revision: {data_rev}")
+    subprocess.run(["dvc", "checkout", RAW_DATA_FILE.as_posix(), "--rev", data_rev], check=True)
+    logger.info(f"Loading dataset from {RAW_DATA_FILE}")
+    return pd.read_csv(RAW_DATA_FILE)
 
 def analyze_data(df):
-    """Perform exploratory data analysis and log results to MLflow."""
-    # TODO: Implement this function
-    pass
+    stats = {
+        "num_rows": len(df),
+        "num_features": df.shape[1],
+        "num_fraud": df[df["Class"] == 1].shape[0],
+        "num_normal": df[df["Class"] == 0].shape[0],
+    }
+    mlflow.log_metrics(stats)
+    logger.info(f"Data summary: {stats}")
+    return stats
 
 def preprocess_data(df):
-    """Preprocess the dataset."""
-    # TODO: Implement this function to:
-    # 1. Handle class imbalance (e.g., using SMOTE)
-    # 2. Normalize features
-    # 3. Split into train/validation/test sets
-    pass
+    logger.info("Splitting features and labels...")
+    X = df.drop(columns=["Class"])
+    y = df["Class"]
+
+    logger.info("Splitting into train/validation/test...")
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.22, random_state=42)
+
+    logger.info("Normalizing features...")
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_val =  scaler.transform(X_val)
+    X_test = scaler.transform(X_test)
+
+    logger.info("Applying SMOTE to balance the dataset...")
+    undersampler = RandomUnderSampler(sampling_strategy=0.1, random_state=42)
+    X_resampled, y_resampled = undersampler.fit_resample(X_train, y_train)
+
+    train_df = pd.DataFrame(X_resampled)
+    train_df["Class"] = y_resampled.values
+
+    val_df = pd.DataFrame(X_val)
+    val_df["Class"] = y_val.values
+
+    test_df = pd.DataFrame(X_test)
+    test_df["Class"] = y_test.values
+
+    return train_df, val_df, test_df
 
 def save_processed_data(train_df, val_df, test_df):
-    """Save processed datasets and track with DVC."""
-    # TODO: Implement this function
-    pass
+    logger.info("Saving processed datasets...")
+    train_path = PROCESSED_DATA_DIR / "train.csv"
+    val_path = PROCESSED_DATA_DIR / "val.csv"
+    test_path = PROCESSED_DATA_DIR / "test.csv"
+
+    train_df.to_csv(train_path, index=False)
+    val_df.to_csv(val_path, index=False)
+    test_df.to_csv(test_path, index=False)
+
+    logger.info("Tracking processed data with DVC...")
+    subprocess.run(["dvc", "add", str(train_path)], check=True)
+    subprocess.run(["dvc", "add", str(val_path)], check=True)
+    subprocess.run(["dvc", "add", str(test_path)], check=True)
+    subprocess.run(["git", "add", str(PROCESSED_DATA_DIR)], check=True)
+    subprocess.run(["git", "commit", "-m", "Add processed datasets"], check=True)
+    subprocess.run(["dvc", "push"], check=True)
 
 def log_to_mlflow(stats, train_df, val_df, test_df):
-    """Log preprocessing results and statistics to MLflow."""
-    # TODO: Implement this function
-    pass
+    mlflow.log_param("train_size", len(train_df))
+    mlflow.log_param("val_size", len(val_df))
+    mlflow.log_param("test_size", len(test_df))
+    mlflow.log_metrics({
+        "class_ratio_train": train_df["Class"].mean(),
+        "class_ratio_val": val_df["Class"].mean(),
+        "class_ratio_test": test_df["Class"].mean()
+    })
 
 def main():
-    """Main function to orchestrate the data preprocessing pipeline."""
     args = parse_args()
     logger.info(f"Starting data preprocessing pipeline with data revision: {args.data_rev}")
-    
-    # TODO: Implement the main workflow
-    # 1. Setup directories and MLflow
-    # 2. Load data from specific DVC revision
-    # 3. Analyze data
-    # 4. Preprocess data
-    # 5. Save processed data
-    # 6. Log results to MLflow
-    
+    setup_directories()
+    setup_mlflow()
+    with mlflow.start_run():
+        df = load_data(args.data_rev)
+        stats = analyze_data(df)
+        train_df, val_df, test_df = preprocess_data(df)
+        save_processed_data(train_df, val_df, test_df)
+        log_to_mlflow(stats, train_df, val_df, test_df)
     logger.info("Data preprocessing completed successfully")
 
 if __name__ == "__main__":

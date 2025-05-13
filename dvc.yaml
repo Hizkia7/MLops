@@ -1,0 +1,30 @@
+stages:
+  preprocess:
+    cmd: python src/preprocess.py
+    deps:
+      - src/preprocess.py
+      - data/raw/data.csv
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - data/processed/train.csv
+    outs:
+      - models/model.pkl
+    params:
+      - train.random_state
+      - train.test_size
+
+  validate:
+    cmd: python src/validate.py --model-version Staging --data-rev workspace
+    deps:
+      - src/validate.py
+      - models/model.pkl
+      - data/processed/test.csv
+    outs:
+      - models/validation/confusion_matrix.png
+      - models/validation/roc_curve.png
