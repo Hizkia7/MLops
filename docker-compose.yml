@@ -2,12 +2,11 @@ version: '3.8'
 
 services:
   mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
+    build: .
     container_name: mlflow
     ports:
       - "5000:5000"
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
       - MLFLOW_BACKEND_STORE_URI=postgresql://mlflow:mlflow@mlflow-db/mlflow
       - MLFLOW_ARTIFACT_ROOT=s3://mlflow/
       - AWS_ACCESS_KEY_ID=minio
@@ -58,8 +57,10 @@ services:
       /bin/sh -c "
       sleep 5;
       mc alias set myminio http://minio:9000 minio minio123;
-      mc mb myminio/mlflow;
-      mc policy set public myminio/mlflow;
+      if ! mc ls myminio/mlflow >/dev/null 2>&1; then
+        mc mb myminio/mlflow;
+      fi;
+      mc anonymous set download myminio/mlflow;
       exit 0;
       "
     networks:

@@ -2,16 +2,21 @@ stages:
   preprocess:
     cmd: python src/preprocess.py
     deps:
-      - src/preprocess.py
-      - data/raw/data.csv
+      - scripts/preprocess.py
+      - data/raw/creditcard-data.csv
     outs:
       - data/processed/train.csv
+      #- data/processed/train.csv.dvc
       - data/processed/test.csv
+      #- data/processed/test.csv.dvc
+      - data/processed/val.csv
+      #- data/processed/val.csv.dvc
+
 
   train:
     cmd: python src/train.py
     deps:
-      - src/train.py
+      - scripts/train.py
       - data/processed/train.csv
     outs:
       - models/model.pkl
@@ -22,7 +27,7 @@ stages:
   validate:
     cmd: python src/validate.py --model-version Staging --data-rev workspace
     deps:
-      - src/validate.py
+      - scripts/validate.py
       - models/model.pkl
       - data/processed/test.csv
     outs:

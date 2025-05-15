@@ -57,12 +57,13 @@ def setup_directories():
 
 
 def setup_mlflow():
-    mlflow.set_tracking_uri("http://localhost:5000")
+    mlflow.set_tracking_uri("http://mlflow:5000")
     mlflow.set_experiment("credit-card-fraud-detection")
 
 
 def load_data(data_rev):
-    subprocess.run(["dvc", "pull", str(PROCESSED_DATA_DIR), "-r", "origin", "--rev", data_rev], check=True)
+    logger.info(f"Pulling data from DVC revision: {data_rev}")
+    subprocess.run(["dvc", "pull", str(PROCESSED_DATA_DIR), "--rev", data_rev], check=True)
     train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
     val_df = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
     X_train = train_df.drop(columns=["Class"])
@@ -73,7 +74,7 @@ def load_data(data_rev):
 
 
 def train_model(X_train, y_train, X_val, y_val):
-    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+    model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
 
     param_dist = {
         "n_estimators": [100, 200, 300],
@@ -82,14 +83,17 @@ def train_model(X_train, y_train, X_val, y_val):
         "subsample": [0.6, 0.8, 1.0]
     }
 
+    logger.info("Starting hyperparameter tuning with RandomizedSearchCV...")
     search = RandomizedSearchCV(model, param_distributions=param_dist, n_iter=10,
                                 scoring='roc_auc', cv=3, verbose=1, n_jobs=-1, random_state=42)
     search.fit(X_train, y_train)
     best_model = search.best_estimator_
+    logger.info(f"Best hyperparameters: {search.best_params_}")
     return best_model, search.best_params_
 
 
 def evaluate_model(model, X_val, y_val):
+    logger.info("Evaluating model on validation data...")
     y_pred = model.predict(X_val)
     y_proba = model.predict_proba(X_val)[:, 1]
     metrics = {
@@ -100,18 +104,20 @@ def evaluate_model(model, X_val, y_val):
         "roc_auc": roc_auc_score(y_val, y_proba),
         "avg_precision": average_precision_score(y_val, y_proba)
     }
+    logger.info(f"Evaluation metrics: {metrics}")
     return metrics
 
 
-def log_to_mlflow(model, params, metrics, X_val, y_val):
+def log_to_mlflow(model, params, metrics):
     with mlflow.start_run():
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
         mlflow.xgboost.log_model(model, "model")
-        mlflow.register_model("runs:/{}/model".format(mlflow.active_run().info.run_id), "fraud-detection-model")
+        mlflow.register_model(f"runs:/{mlflow.active_run().info.run_id}/model", "fraud-detection-model")
 
 
 def save_model(model):
+    logger.info("Saving model to disk...")
     joblib.dump(model, MODELS_DIR / "model.joblib")
 
 
@@ -124,7 +130,7 @@ def main():
     X_train, y_train, X_val, y_val = load_data(args.data_rev)
     model, best_params = train_model(X_train, y_train, X_val, y_val)
     metrics = evaluate_model(model, X_val, y_val)
-    log_to_mlflow(model, best_params, metrics, X_val, y_val)
+    log_to_mlflow(model, best_params, metrics)
     save_model(model)
 
     logger.info("Model training completed successfully")

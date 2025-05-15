@@ -5,3 +5,4 @@
     endpointurl = http://localhost:9000
     access_key_id = minio
     secret_access_key = minio123
+    region = us-east-1

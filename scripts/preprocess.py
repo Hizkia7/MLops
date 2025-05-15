@@ -42,21 +42,26 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 RAW_DATA_FILE = RAW_DATA_DIR / "creditcard-data.csv"
 
 def parse_args():
+    logger.info(f"Check parser")
     parser = argparse.ArgumentParser(description='Data preprocessing script')
-    parser.add_argument('--data-rev', type=str, required=True, help='DVC revision/version of the raw data to use')
-    return parser.parse_args()
+    logger.info(f"Check parser 1")
+    parser.add_argument('--data-rev', type=str, required=False, default="HEAD", help='(Optional) DVC revision/version of the raw data to use. Defaults to HEAD.')
+    logger.info(f"Check parser 2")
+    return parser.parse_known_args()[0]
 
 def setup_directories():
     logger.info(f"Creating processed data directory: {PROCESSED_DATA_DIR}")
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def setup_mlflow():
-    mlflow.set_tracking_uri("http://mlflow:5000")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("Preprocessing")
 
 def load_data(data_rev):
     logger.info(f"Checking out raw data at DVC revision: {data_rev}")
-    subprocess.run(["dvc", "checkout", RAW_DATA_FILE.as_posix(), "--rev", data_rev], check=True)
+    # subprocess.run(["dvc", "checkout", RAW_DATA_FILE.as_posix(), "--rev", data_rev], check=True)
+    subprocess.run(["git", "checkout", data_rev], check=True)
+    subprocess.run(["dvc", "pull", RAW_DATA_FILE.as_posix()], check=True)
     logger.info(f"Loading dataset from {RAW_DATA_FILE}")
     return pd.read_csv(RAW_DATA_FILE)
 
@@ -111,13 +116,7 @@ def save_processed_data(train_df, val_df, test_df):
     val_df.to_csv(val_path, index=False)
     test_df.to_csv(test_path, index=False)
 
-    logger.info("Tracking processed data with DVC...")
-    subprocess.run(["dvc", "add", str(train_path)], check=True)
-    subprocess.run(["dvc", "add", str(val_path)], check=True)
-    subprocess.run(["dvc", "add", str(test_path)], check=True)
-    subprocess.run(["git", "add", str(PROCESSED_DATA_DIR)], check=True)
-    subprocess.run(["git", "commit", "-m", "Add processed datasets"], check=True)
-    subprocess.run(["dvc", "push"], check=True)
+    logger.info("Processed datasets saved.")
 
 def log_to_mlflow(stats, train_df, val_df, test_df):
     mlflow.log_param("train_size", len(train_df))

@@ -30,6 +30,7 @@ DATA_URL = "https://nextcloud.scopicsoftware.com/s/bo5PTKgpngWymGE/download/cred
 DATA_DIR = Path("data")
 RAW_DATA_DIR = DATA_DIR / "raw"
 RAW_DATA_FILE = RAW_DATA_DIR / "creditcard-data.csv"
+GIT_IGNORE = "data/raw/.gitignore"
 # Expected SHA256 checksum of the file (optional for validation)
 EXPECTED_SHA256 = None  # Replace with actual SHA256 if known
 
@@ -78,6 +79,12 @@ def validate_data():
     else:
         logger.warning("No expected checksum provided. Skipping validation.")
 
+def has_staged_changes():
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"]
+    )
+    return result.returncode != 0  # True if there are staged changes
+
 def initialize_dvc():
     """Initialize DVC and add data to tracking."""
     if not Path(".dvc").exists():
@@ -88,8 +95,13 @@ def initialize_dvc():
     subprocess.run(["dvc", "add", str(RAW_DATA_FILE)], check=True)
 
     logger.info("Committing DVC changes to Git...")
-    subprocess.run(["git", "add", str(RAW_DATA_FILE) + ".dvc", ".gitignore"], check=True)
-    subprocess.run(["git", "commit", "-m", "Add raw dataset to DVC"], check=True)
+    subprocess.run(["git", "add", str(RAW_DATA_FILE) + ".dvc"], check=True)
+    subprocess.run(["git", "add", GIT_IGNORE], check=True)
+    
+    if has_staged_changes():
+        subprocess.run(["git", "commit", "-m", "Add raw dataset to DVC"], check=True)
+    else:
+        print("Nothing to commit — working tree clean.")
 
     logger.info("Pushing data to DVC remote...")
     subprocess.run(["dvc", "push"], check=True)
