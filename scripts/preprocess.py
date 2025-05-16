@@ -4,9 +4,9 @@ Data preprocessing script for Credit Card Fraud Detection MLOps Pipeline.
 
 This script:
 1. Loads a specific version of raw data from DVC
-2. Handles class imbalance
+2. Splits data into train/validation/test sets
 3. Normalizes features
-4. Splits data into train/validation/test sets
+4. Handles class imbalance
 5. Saves processed datasets back to DVC
 6. Logs preprocessing steps to MLflow
 
@@ -92,7 +92,7 @@ def preprocess_data(df):
     X_val =  scaler.transform(X_val)
     X_test = scaler.transform(X_test)
 
-    logger.info("Applying SMOTE to balance the dataset...")
+    logger.info("Applying Downsampling to balance the dataset...")
     undersampler = RandomUnderSampler(sampling_strategy=0.1, random_state=42)
     X_resampled, y_resampled = undersampler.fit_resample(X_train, y_train)
 
@@ -124,7 +124,11 @@ def save_processed_data(train_df, val_df, test_df):
     subprocess.run(["dvc", "commit", "preprocess", "--force"], check=True)
     time.sleep(10)
     subprocess.run(["git", "add", "."], check=True)
-    subprocess.run(["git", "commit", "-m", "Add processed datasets"], check=True)
+    result = subprocess.run(["git", "diff", "--cached", "--quiet"])
+    if result.returncode != 0:  # there are staged changes
+        subprocess.run(["git", "commit", "-m", "Add processed datasets"], check=True)
+    else:
+        print("No changes to commit.")
     subprocess.run(["dvc", "push"], check=True)
 
 def log_to_mlflow(stats, train_df, val_df, test_df):

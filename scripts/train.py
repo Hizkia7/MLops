@@ -29,6 +29,7 @@ from sklearn.metrics import (
 )
 import mlflow
 import mlflow.xgboost
+from mlflow.tracking import MlflowClient
 import subprocess
 from dotenv import load_dotenv
 
@@ -81,7 +82,7 @@ def load_data(data_rev):
     return X_train, y_train, X_val, y_val
 
 
-def train_model(X_train, y_train, X_val, y_val):
+def train_model(X_train, y_train):
     model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
 
     param_dist = {
@@ -117,11 +118,26 @@ def evaluate_model(model, X_val, y_val):
 
 
 def log_to_mlflow(model, params, metrics):
-    with mlflow.start_run():
+    with mlflow.start_run() as run:
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
         mlflow.xgboost.log_model(model, "model")
-        mlflow.register_model(f"runs:/{mlflow.active_run().info.run_id}/model", "fraud-detection-model")
+
+        run_id = run.info.run_id
+        model_uri = f"runs:/{run_id}/model"
+        # Register the model to the MLflow Model Registry
+        registered_model = mlflow.register_model(model_uri, "fraud-detection-model")
+
+        # Transition the newly registered model version to "Staging"
+        client = MlflowClient()
+        client.transition_model_version_stage(
+            name="fraud-detection-model",
+            version=registered_model.version,
+            stage="Staging",
+            archive_existing_versions=True
+        )
+
+        logger.info(f"Model version {registered_model.version} registered and transitioned to Staging.")
 
 
 def save_model(model):
@@ -136,7 +152,7 @@ def main():
     setup_directories()
     setup_mlflow()
     X_train, y_train, X_val, y_val = load_data(args.data_rev)
-    model, best_params = train_model(X_train, y_train, X_val, y_val)
+    model, best_params = train_model(X_train, y_train)
     metrics = evaluate_model(model, X_val, y_val)
     log_to_mlflow(model, best_params, metrics)
     save_model(model)

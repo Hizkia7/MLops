@@ -7,6 +7,7 @@ import os
 import sys
 import logging
 import argparse
+import subprocess
 from pathlib import Path
 from typing import Dict
 import numpy as np
@@ -33,6 +34,8 @@ logger = logging.getLogger("model-validation")
 # Constants
 DATA_DIR = Path("data")
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+PROCESSED_DATA_FILE_TEST = PROCESSED_DATA_DIR / "test.csv"
+
 MODELS_DIR = Path("models")
 VALIDATION_DIR = MODELS_DIR / "validation"
 VALIDATION_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,7 +44,7 @@ PERFORMANCE_REQUIREMENTS = {
     "min_accuracy": 0.98,
     "min_precision": 0.85,
     "min_recall": 0.70,
-    "min_f1": 0.75,
+    "min_f1_score": 0.75,
     "min_roc_auc": 0.95
 }
 
@@ -50,23 +53,22 @@ class InferenceInput(BaseModel):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Model validation script')
-    parser.add_argument('--model-version', type=str, required=True)
-    parser.add_argument('--data-rev', type=str, required=True)
+    parser.add_argument('--model-version', type=str, required=False, default="Staging")
+    parser.add_argument('--data-rev', type=str, required=False, default="HEAD")
     parser.add_argument('--start-api', action='store_true')
     return parser.parse_args()
 
 def setup_mlflow():
-    mlflow.set_tracking_uri("http://mlflow:5000")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("credit-card-fraud-detection")
 
 def load_model(model_version: str):
-    model_uri = f"models:/fraud-detection-model/{model_version}"
-    logger.info(f"Loading model from MLflow: {model_uri}")
-    return mlflow.pyfunc.load_model(model_uri)
+    logger.info(f"Loading model version '{model_version}' from MLflow registry...")
+    return mlflow.xgboost.load_model(f"models:/fraud-detection-model/{model_version}")
 
 def load_test_data(data_rev: str):
     logger.info(f"Pulling test data from DVC revision: {data_rev}")
-    subprocess.run(["dvc", "pull", str(PROCESSED_DATA_DIR), "--rev", data_rev], check=True)
+    subprocess.run(["dvc", "pull", "--force", PROCESSED_DATA_FILE_TEST.as_posix()], check=True)
 
     test_df = pd.read_csv(PROCESSED_DATA_DIR / "test.csv")
     X_test = test_df.drop(columns=["Class"])
@@ -93,6 +95,11 @@ def validate_performance(metrics: Dict[str, float]):
         key for key, val in PERFORMANCE_REQUIREMENTS.items()
         if metrics.get(key.replace("min_", ""), 0) < val
     ]
+
+    for key, val in PERFORMANCE_REQUIREMENTS.items():
+        print(key, val)
+        print(metrics.get(key.replace("min_", ""), 0))
+        
     if failed_metrics:
         logger.warning(f"Model failed to meet performance requirements for: {failed_metrics}")
         return False
@@ -153,6 +160,8 @@ def setup_api(model):
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 def main():
+    import sys
+    sys.argv = [sys.argv[0]]
     args = parse_args()
     setup_mlflow()
 
@@ -175,5 +184,4 @@ def main():
     logger.info("Model validation pipeline completed.")
 
 if __name__ == "__main__":
-    import subprocess
     main()
