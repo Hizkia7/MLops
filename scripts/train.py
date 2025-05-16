@@ -30,6 +30,7 @@ from sklearn.metrics import (
 import mlflow
 import mlflow.xgboost
 import subprocess
+from dotenv import load_dotenv
 
 # Setup logging
 logging.basicConfig(
@@ -42,14 +43,20 @@ logger = logging.getLogger('model-training')
 # Constants
 DATA_DIR = Path("data")
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+PROCESSED_DATA_FILE_TRAIN = PROCESSED_DATA_DIR / "train.csv"
+PROCESSED_DATA_FILE_VAL = PROCESSED_DATA_DIR / "val.csv"
 MODELS_DIR = Path("models")
+load_dotenv()
 
+print("AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
+print("AWS_SECRET_ACCESS_KEY:", os.getenv("AWS_SECRET_ACCESS_KEY"))
+print("MLFLOW_S3_ENDPOINT_URL:", os.getenv("MLFLOW_S3_ENDPOINT_URL"))
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Model training script')
-    parser.add_argument('--data-rev', type=str, required=True,
-                        help='DVC revision/version of the processed data to use')
-    return parser.parse_args()
+    parser.add_argument('--data-rev', type=str, required=False, default="HEAD",
+                        help='(Optional) DVC revision/version of the processed data to use')
+    return parser.parse_known_args()[0]
 
 
 def setup_directories():
@@ -57,13 +64,14 @@ def setup_directories():
 
 
 def setup_mlflow():
-    mlflow.set_tracking_uri("http://mlflow:5000")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("credit-card-fraud-detection")
 
 
 def load_data(data_rev):
     logger.info(f"Pulling data from DVC revision: {data_rev}")
-    subprocess.run(["dvc", "pull", str(PROCESSED_DATA_DIR), "--rev", data_rev], check=True)
+    subprocess.run(["dvc", "pull", "--force", PROCESSED_DATA_FILE_TRAIN.as_posix()], check=True)
+    subprocess.run(["dvc", "pull", "--force", PROCESSED_DATA_FILE_VAL.as_posix()], check=True)
     train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
     val_df = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
     X_train = train_df.drop(columns=["Class"])

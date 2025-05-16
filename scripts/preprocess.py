@@ -16,6 +16,7 @@ Usage:
 
 import os
 import sys
+import time
 import logging
 import argparse
 import subprocess
@@ -116,7 +117,15 @@ def save_processed_data(train_df, val_df, test_df):
     val_df.to_csv(val_path, index=False)
     test_df.to_csv(test_path, index=False)
 
-    logger.info("Processed datasets saved.")
+    logger.info("Tracking processed data with DVC...")
+    # subprocess.run(["dvc", "commit", train_path.as_posix()], check=True)
+    # subprocess.run(["dvc", "commit", str(val_path)], check=True)
+    # subprocess.run(["dvc", "commit", str(test_path)], check=True)
+    subprocess.run(["dvc", "commit", "preprocess", "--force"], check=True)
+    time.sleep(10)
+    subprocess.run(["git", "add", "."], check=True)
+    subprocess.run(["git", "commit", "-m", "Add processed datasets"], check=True)
+    subprocess.run(["dvc", "push"], check=True)
 
 def log_to_mlflow(stats, train_df, val_df, test_df):
     mlflow.log_param("train_size", len(train_df))

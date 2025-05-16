@@ -9,3 +9,4 @@ uvicorn
 joblib
 matplotlib
 imbalanced-learn
+python-dotenv
