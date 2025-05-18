@@ -34,6 +34,19 @@ jobs:
         pip install -r requirements.txt
         pip install 'dvc[s3]'
 
+    - name: Start MinIO server in Docker
+      run: |
+        docker run -d -p 9000:9000 --name minio \
+          -e MINIO_ACCESS_KEY=$AWS_ACCESS_KEY_ID \
+          -e MINIO_SECRET_KEY=$AWS_SECRET_ACCESS_KEY \
+          minio/minio server /data
+        # Wait for MinIO to be ready
+        for i in {1..10}; do
+          curl --silent --fail $MLFLOW_S3_ENDPOINT_URL/minio/health/live && break
+          echo "Waiting for MinIO to start..."
+          sleep 3
+        done
+
     - name: Debug environment variables (safe)
       run: |
         echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
