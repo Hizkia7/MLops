@@ -1,4 +1,11 @@
 stages:
+  generate_data:
+    cmd: python scripts/setup.py
+    deps:
+      - scripts/setup.py
+    outs:
+      - data/raw/creditcard-data.csv
+
   preprocess:
     cmd: python scripts/preprocess.py
     deps:
