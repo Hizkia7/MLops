@@ -143,6 +143,7 @@ def log_to_mlflow(model, params, metrics):
 def save_model(model):
     logger.info("Saving model to disk...")
     joblib.dump(model, MODELS_DIR / "model.joblib")
+    logger.info(f"Model saved to {MODELS_DIR / 'model.joblib'} (DVC will track it)")
 
 
 def main():
