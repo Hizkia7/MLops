@@ -32,7 +32,7 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install 'dvc[s3]'
+        pip install 'dvc[s3]' awscli
 
     - name: Start MinIO server in Docker
       run: |
@@ -47,22 +47,17 @@ jobs:
           sleep 3
         done
 
-    - name: Debug environment variables (safe)
+    - name: Create mlflow bucket in MinIO
       run: |
-        echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
-        echo "MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}"
+        export AWS_ACCESS_KEY_ID=minio
+        export AWS_SECRET_ACCESS_KEY=minio123
+        aws --endpoint-url http://localhost:9000 s3 mb s3://mlflow || true
 
-    - name: Write secrets to .env file (optional)
+    - name: Configure DVC remote and pull
       run: |
-        echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" >> .env
-        echo "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" >> .env
-        echo "MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}" >> .env
-
-    - name: Set up DVC remote and pull
-      run: |
-        dvc remote modify minio endpointurl $MLFLOW_S3_ENDPOINT_URL
-        dvc remote modify minio access_key_id $AWS_ACCESS_KEY_ID
-        dvc remote modify minio secret_access_key $AWS_SECRET_ACCESS_KEY
+        dvc remote modify minio endpointurl http://localhost:9000
+        dvc remote modify minio access_key_id minio
+        dvc remote modify minio secret_access_key minio123
         dvc pull
 
     - name: Run pipeline
