@@ -8,6 +8,7 @@ on:
       - 'dvc.yaml'
       - 'dvc.lock'
       - 'requirements.txt'
+  workflow_dispatch:
 
 jobs:
   pipeline:
