@@ -45,7 +45,7 @@ jobs:
 
     - name: Set up DVC remote and pull
       run: |
-        dvc remote modify myremote endpointurl $MLFLOW_S3_ENDPOINT_URL
+        dvc remote modify minio endpointurl $MLFLOW_S3_ENDPOINT_URL
         dvc pull
 
     - name: Run pipeline
