@@ -88,6 +88,15 @@ jobs:
           dvc push
         fi
 
+    - name: Untrack model.joblib from Git (one-time fix)
+      run: |
+        if git ls-files --error-unmatch models/model.joblib > /dev/null 2>&1; then
+          git rm --cached models/model.joblib
+          git commit -m "Untrack model.joblib so DVC can manage it"
+        else
+          echo "model.joblib not tracked by Git, skipping..."
+        fi
+
     - name: Run pipeline
       run: |
         dvc repro
