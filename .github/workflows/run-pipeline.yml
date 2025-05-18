@@ -58,7 +58,15 @@ jobs:
         dvc remote modify minio endpointurl http://localhost:9000
         dvc remote modify minio access_key_id minio
         dvc remote modify minio secret_access_key minio123
-        dvc pull
+    
+    - name: Try pulling data, or fall back to repro + push
+      run: |
+        echo "Trying to pull data from DVC remote..."
+        if ! dvc pull; then
+          echo "⚠️ DVC pull failed — attempting to regenerate pipeline outputs..."
+          dvc repro
+          dvc push
+        fi
 
     - name: Run pipeline
       run: |
