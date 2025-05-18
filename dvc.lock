@@ -68,3 +68,15 @@ stages:
       hash: md5
       md5: 46be5be1510773795306a1e039f61854
       size: 16196
+  generate_data:
+    cmd: python scripts/setup.py
+    deps:
+    - path: scripts/setup.py
+      hash: md5
+      md5: 51c2502b117ec0f2bbe7a3c4df72fe23
+      size: 3863
+    outs:
+    - path: data/raw/creditcard-data.csv
+      hash: md5
+      md5: e90efcb83d69faf99fcab8b0255024de
+      size: 150828752

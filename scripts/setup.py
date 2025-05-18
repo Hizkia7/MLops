@@ -91,20 +91,20 @@ def initialize_dvc():
         logger.info("Initializing DVC...")
         subprocess.run(["dvc", "init"], check=True)
 
-    logger.info(f"Adding {RAW_DATA_FILE} to DVC tracking...")
-    subprocess.run(["dvc", "add", str(RAW_DATA_FILE)], check=True)
+    #logger.info(f"Adding {RAW_DATA_FILE} to DVC tracking...")
+    #subprocess.run(["dvc", "add", str(RAW_DATA_FILE)], check=True)
 
-    logger.info("Committing DVC changes to Git...")
-    subprocess.run(["git", "add", str(RAW_DATA_FILE) + ".dvc"], check=True)
-    subprocess.run(["git", "add", GIT_IGNORE], check=True)
+    # logger.info("Committing DVC changes to Git...")
+    # subprocess.run(["git", "add", str(RAW_DATA_FILE) + ".dvc"], check=True)
+    # subprocess.run(["git", "add", GIT_IGNORE], check=True)
     
-    if has_staged_changes():
-        subprocess.run(["git", "commit", "-m", "Add raw dataset to DVC"], check=True)
-    else:
-        print("Nothing to commit — working tree clean.")
+    # if has_staged_changes():
+    #     subprocess.run(["git", "commit", "-m", "Add raw dataset to DVC"], check=True)
+    # else:
+    #     print("Nothing to commit — working tree clean.")
 
     logger.info("Pushing data to DVC remote...")
-    subprocess.run(["dvc", "push"], check=True)
+    # subprocess.run(["dvc", "push"], check=True)
 
 def main():
     """Main function to orchestrate the data acquisition process."""
