@@ -27,6 +27,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from imblearn.under_sampling import RandomUnderSampler
 import mlflow
+from dotenv import load_dotenv
 
 # Setup logging
 logging.basicConfig(
@@ -41,6 +42,11 @@ DATA_DIR = Path("data")
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 RAW_DATA_FILE = RAW_DATA_DIR / "creditcard-data.csv"
+load_dotenv()
+
+print("AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
+print("AWS_SECRET_ACCESS_KEY:", os.getenv("AWS_SECRET_ACCESS_KEY"))
+print("MLFLOW_S3_ENDPOINT_URL:", os.getenv("MLFLOW_S3_ENDPOINT_URL"))
 
 def parse_args():
     logger.info(f"Check parser")
