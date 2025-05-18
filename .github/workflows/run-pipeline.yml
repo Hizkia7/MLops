@@ -3,6 +3,7 @@ name: Run MLOps Pipeline on Data Change
 on:
   push:
     paths:
+      - '.github/workflows/**'
       - 'data/raw/**'
       - 'scripts/**'
       - 'dvc.yaml'
