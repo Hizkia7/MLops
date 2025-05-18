@@ -26,6 +26,7 @@ from sklearn.metrics import (
 
 from fastapi import FastAPI
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -39,6 +40,12 @@ PROCESSED_DATA_FILE_TEST = PROCESSED_DATA_DIR / "test.csv"
 MODELS_DIR = Path("models")
 VALIDATION_DIR = MODELS_DIR / "validation"
 VALIDATION_DIR.mkdir(parents=True, exist_ok=True)
+
+load_dotenv()
+
+print("AWS_ACCESS_KEY_ID:", os.getenv("AWS_ACCESS_KEY_ID"))
+print("AWS_SECRET_ACCESS_KEY:", os.getenv("AWS_SECRET_ACCESS_KEY"))
+print("MLFLOW_S3_ENDPOINT_URL:", os.getenv("MLFLOW_S3_ENDPOINT_URL"))
 
 PERFORMANCE_REQUIREMENTS = {
     "min_accuracy": 0.98,
