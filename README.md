@@ -41,6 +41,22 @@ pip install -r requirements.txt
 
 ## 📦 DVC Setup
 
+## 🐳 Start MLflow + MinIO (Before Running Scripts)
+
+You must start the MLflow Tracking Server and MinIO before running any pipeline scripts.
+This is required for logging, model registration, and DVC remote storage.
+
+Start them with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+- MLflow UI: http://localhost:5000
+- MinIO Console: http://localhost:9000 (login using credentials from `.env`)
+
+---
+
 ### 1. Initialize DVC
 
 ```bash
@@ -58,88 +74,55 @@ dvc remote modify myremote secret_access_key <your-secret-key>
 
 > Your credentials can be stored in a `.env` file.
 
+
 ## ⚙️ Running the Pipeline
 
-### Step 1: Download and Track Dataset
+### Automatic Pipeline Execution on New Data
+
+This pipeline is integrated with **GitHub Actions** to run automatically when new data is pushed to the repository under `data/raw/`.
+
+Whenever new credit card data is added and pushed:
 
 ```bash
+# Download or copy new data to data/raw/
 python scripts/setup.py
+
+# Re-track the data (if modified)
+dvc add data/raw/creditcard-data.csv
+
+# Commit and push to GitHub
+git add data/raw/creditcard-data.csv.dvc
+git commit -m "New data received"
+git push
 ```
 
-This downloads the dataset and adds it to DVC.
+GitHub Actions will then:
+- Automatically run `dvc repro` to execute the full pipeline
+- Push updated artifacts to your DVC remote
+
+> ✅ You no longer need to run scripts like `preprocess.py`, `train.py`, or `validate.py` manually — just `git push` your data update and everything runs automatically.
 
 ---
 
-### Step 2: Preprocess Data
+## 🔁 Manual Reproduction (Optional)
 
-```bash
-python scripts/preprocess.py --data-rev HEAD
-```
-
-This performs normalization, SMOTE, train/val/test split, and logs to MLflow.
-
----
-
-### Step 3: Train Model
-
-```bash
-python scripts/train.py --data-rev HEAD
-```
-
-This trains an XGBoost model with hyperparameter tuning and registers it to MLflow.
-
----
-
-### Step 4: Validate Model
-
-```bash
-python scripts/validate.py --model-version Staging --data-rev HEAD
-```
-
-This evaluates the model, checks performance thresholds, and logs metrics/artifacts.
-
-To start the prediction API:
-
-```bash
-python scripts/validate.py --start-api
-```
-
----
-
-## 🔁 Automate Pipeline with DVC
-
-Make sure your `dvc.yaml` file contains all pipeline stages.
-
-Run the entire pipeline:
+You can still manually run the pipeline locally using:
 
 ```bash
 dvc repro
 ```
 
-Visualize the pipeline graph:
+To view the pipeline graph:
 
 ```bash
 dvc dag
 ```
 
-Push results to remote storage:
+To push outputs to remote:
 
 ```bash
 dvc push
 ```
-
----
-
-## 🐳 MLflow + MinIO via Docker
-
-To start the tracking server and MinIO:
-
-```bash
-docker-compose up -d
-```
-
-- MLflow UI: http://localhost:5000
-- MinIO Console: http://localhost:9000 (login with keys in `.env`)
 
 ---
 
@@ -190,11 +173,7 @@ Unit testing framework setup (e.g., `pytest`) is optional for future extension.
 ## 🔧 Future Improvements
 
 - Add `pytest`-based unit and integration tests
-- Integrate CI/CD (e.g., GitHub Actions)
 - Extend to cloud-native pipeline (e.g., with Airflow, SageMaker)
+- Use asynchronous notifications when pipeline completes
 
 ---
-
-## 👨‍💻 Author
-
-MLOps Pipeline by [Your Name]

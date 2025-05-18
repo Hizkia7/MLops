@@ -1,7 +1,7 @@
 schema: '2.0'
 stages:
   preprocess:
-    cmd: python src/preprocess.py
+    cmd: python scripts/preprocess.py
     deps:
     - path: data/raw/creditcard-data.csv
       hash: md5
@@ -24,3 +24,47 @@ stages:
       hash: md5
       md5: 0dc0e2240c0d38c2c9b2f13030ae8858
       size: 33639065
+  train:
+    cmd: python scripts/train.py
+    deps:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: ec01a801490e734a38d9a5b4f83281d2
+      size: 2194189
+    - path: scripts/train.py
+      hash: md5
+      md5: 1020cbeef60af11651cbbebe0fa98b01
+      size: 5447
+    params:
+      params.yaml:
+        train.random_state: 42
+        train.test_size: 0.2
+    outs:
+    - path: models/model.joblib
+      hash: md5
+      md5: c9e31bf8eb79366156498bbc39e62ff4
+      size: 312709
+  validate:
+    cmd: python scripts/validate.py --model-version Staging --data-rev workspace
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 6808d05d99bf846e52c204e2c79e149e
+      size: 16989365
+    - path: models/model.joblib
+      hash: md5
+      md5: c9e31bf8eb79366156498bbc39e62ff4
+      size: 312709
+    - path: scripts/validate.py
+      hash: md5
+      md5: eaade42a142ead51cc53fe45e66a7a3d
+      size: 6288
+    outs:
+    - path: models/validation/confusion_matrix.png
+      hash: md5
+      md5: 765fe7c79b00afc5924143f53d8b53b0
+      size: 7477
+    - path: models/validation/roc_curve.png
+      hash: md5
+      md5: 46be5be1510773795306a1e039f61854
+      size: 16196

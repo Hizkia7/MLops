@@ -1,6 +1,6 @@
 stages:
   preprocess:
-    cmd: python src/preprocess.py
+    cmd: python scripts/preprocess.py
     deps:
       - scripts/preprocess.py
       - data/raw/creditcard-data.csv
@@ -14,21 +14,21 @@ stages:
 
 
   train:
-    cmd: python src/train.py
+    cmd: python scripts/train.py
     deps:
       - scripts/train.py
       - data/processed/train.csv
     outs:
-      - models/model.pkl
+      - models/model.joblib
     params:
       - train.random_state
       - train.test_size
 
   validate:
-    cmd: python src/validate.py --model-version Staging --data-rev workspace
+    cmd: python scripts/validate.py --model-version Staging --data-rev workspace
     deps:
       - scripts/validate.py
-      - models/model.pkl
+      - models/model.joblib
       - data/processed/test.csv
     outs:
       - models/validation/confusion_matrix.png
