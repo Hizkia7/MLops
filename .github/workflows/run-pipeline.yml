@@ -82,10 +82,13 @@ jobs:
     - name: Untrack model.joblib from Git (one-time fix)
       run: |
         if git ls-files --error-unmatch models/model.joblib > /dev/null 2>&1; then
+          git config user.name "${{ secrets.GIT_USER_NAME }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
           git rm --cached models/model.joblib
           git commit -m "Untrack model.joblib so DVC can manage it"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
         else
-          echo "model.joblib not tracked by Git, skipping..."
+          echo "models/model.joblib is not tracked by Git, skipping untrack step..."
         fi
 
     - name: Try pulling data, or fall back to repro + push
