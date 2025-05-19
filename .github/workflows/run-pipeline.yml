@@ -88,7 +88,7 @@ jobs:
           git commit -m "Untrack model.joblib so DVC can manage it"
           git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} HEAD:${{ github.ref_name }}
         else
-          echo "models/model.joblib is not tracked by Git, skipping untrack step..."
+          echo "models/model.joblib is not tracked by Git, skipping untrack step...."
         fi
 
     - name: Try pulling data, or fall back to repro + push
